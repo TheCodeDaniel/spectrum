@@ -2,6 +2,7 @@ import { ZoneBase } from './ZoneBase.js';
 import { DIALOGUE } from '../data/dialogue.js';
 
 export class Zone3 extends ZoneBase {
+  constructor() { super('Zone3'); }
   static ZONE_NUM = 3;
   static WORLD_WIDTH = 5280;
   static COLORS = {
