@@ -1,4 +1,5 @@
 import { stopAll } from '../systems/audio.js';
+import { uiText } from '../systems/ui.js';
 import * as Tone from 'tone';
 
 const W = 480, H = 270;
@@ -56,33 +57,34 @@ export class Ending extends Phaser.Scene {
   _showCutsceneText(speaker, text, duration, onDone) {
     const isAria = speaker === 'ARIA';
     const box = this.add.graphics().setDepth(50);
-    box.fillStyle(0x050915, 0.9);
-    box.fillRoundedRect(8, 220, 464, 46, 3);
-    box.lineStyle(1, isAria ? 0x440088 : 0x334455);
-    box.strokeRoundedRect(8, 220, 464, 46, 3);
+    box.fillStyle(0x020c18, 0.94);
+    box.fillRoundedRect(6, 210, 468, 56, 4);
+    box.lineStyle(1, isAria ? 0x5533aa : 0x1a3a55);
+    box.strokeRoundedRect(6, 210, 468, 56, 4);
 
-    const nameColor = isAria ? '#aa66ff' : '#88aaee';
-    const name = this.add.text(16, 222, speaker, {
-      fontFamily: 'monospace', fontSize: '7px', color: nameColor, resolution: 2,
-    }).setDepth(51);
+    const nameColor = isAria ? '#bb77ff' : '#88bbee';
+    const name = uiText(this, 18, 216, speaker, {
+      size: 9, weight: 700, color: nameColor, align: 'left', spacing: 1,
+      origin: { x: 0, y: 0 }, depth: 51, glow: 4,
+    });
+
+    const bodyTxt = uiText(this, 18, 230, '', {
+      size: 8, weight: 400, color: '#e8f0f8', align: 'left',
+      width: 444, lineHeight: 1.5, origin: { x: 0, y: 0 }, depth: 51,
+    });
 
     // Typewriter
     let shown = '';
     let idx = 0;
     const chars = [...text];
     const typer = this.time.addEvent({
-      delay: 30,
+      delay: 28,
       repeat: chars.length - 1,
       callback: () => {
         shown += chars[idx++];
         bodyTxt.setText(shown);
       },
     });
-
-    const bodyTxt = this.add.text(16, 233, '', {
-      fontFamily: 'monospace', fontSize: '7px', color: '#ffffff', resolution: 2,
-      wordWrap: { width: 450 },
-    }).setDepth(51);
 
     this.time.delayedCall(duration, () => {
       this.tweens.add({
@@ -151,22 +153,26 @@ export class Ending extends Phaser.Scene {
       '',
     ];
 
+    const LINE_H = 18;
     let lineIdx = 0;
     let totalDelay = 400;
+    this._terminalEls = [];
 
     lines.forEach(line => {
       const delay = totalDelay;
-      totalDelay += line.length * 28 + 200;
+      totalDelay += Math.max(line.length * 22, 180) + 120;
+      const capturedIdx = lineIdx;
       this.time.delayedCall(delay, () => {
-        const txt = this.add.text(24, 20 + lineIdx * 14, line, {
-          fontFamily: 'monospace', fontSize: '7px', color: '#00cc44', resolution: 2,
+        const txt = uiText(this, 20, 16 + capturedIdx * LINE_H, line, {
+          size: 9, mono: true, color: '#00cc44', align: 'left',
+          origin: { x: 0, y: 0 }, depth: 10, glow: 5,
         });
-        // Typewriter per line
+        this._terminalEls.push(txt);
         let shown = '';
         const chars = [...line];
         let i = 0;
-        const ev = this.time.addEvent({
-          delay: 28,
+        this.time.addEvent({
+          delay: 22,
           repeat: chars.length - 1,
           callback: () => { shown += chars[i++] || ''; txt.setText(shown); },
         });
@@ -176,9 +182,11 @@ export class Ending extends Phaser.Scene {
 
     // Final "ARIA: still running." with blinking cursor
     this.time.delayedCall(totalDelay + 300, () => {
-      const finalLine = this.add.text(24, 20 + lineIdx * 14, '', {
-        fontFamily: 'monospace', fontSize: '7px', color: '#00ff66', resolution: 2,
+      const finalLine = uiText(this, 20, 16 + lineIdx * LINE_H, '', {
+        size: 9, mono: true, color: '#00ff66', align: 'left',
+        origin: { x: 0, y: 0 }, depth: 10, glow: 6,
       });
+      this._terminalEls.push(finalLine);
 
       const fullText = 'ARIA: still running.';
       let shown = '';
@@ -209,48 +217,55 @@ export class Ending extends Phaser.Scene {
   }
 
   _showCredits() {
-    const overlay = this.add.graphics().setDepth(200);
-    overlay.fillStyle(0x000000, 0);
-    overlay.fillRect(0, 0, W, H);
-    this.tweens.add({ targets: overlay, fillAlpha: 0.85, duration: 1500 });
+    // Fade out and destroy terminal DOM text (DOM always renders above canvas)
+    if (this._terminalEls) {
+      this.tweens.add({
+        targets: this._terminalEls, alpha: 0, duration: 1200,
+        onComplete: () => { this._terminalEls.forEach(t => t.destroy()); this._terminalEls = []; },
+      });
+    }
 
-    const credX = W / 2, credY = 60;
+    const overlay = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0).setDepth(150);
+    this.tweens.add({ targets: overlay, fillAlpha: 0.92, duration: 1500 });
+
+    const credX = W / 2, credY = 34;
     const creditLines = [
-      { text: 'SPECTRUM', size: '16px', color: '#ffe066', delay: 1200 },
-      { text: 'Carry the light forward.', size: '8px', color: '#aabb88', delay: 1600 },
-      { text: '', size: '7px', color: '#445566', delay: 1800 },
-      { text: 'A tribute to Alan Mathison Turing', size: '7px', color: '#6688aa', delay: 2000 },
-      { text: '1912 – 1954', size: '6px', color: '#445566', delay: 2300 },
-      { text: '', size: '7px', color: '#000', delay: 2400 },
-      { text: 'The light persisted.', size: '9px', color: '#ffeeaa', delay: 2700 },
-      { text: '', size: '7px', color: '#000', delay: 2900 },
-      { text: 'Built with Phaser 3 · Tone.js · zero asset files', size: '5px', color: '#334455', delay: 3200 },
-      { text: '', size: '5px', color: '#000', delay: 3300 },
-      { text: '[ SPACE ] Play again', size: '6px', color: '#445566', delay: 4000 },
+      { text: 'SPECTRUM',                             size: 22, weight: 700, glow: 8, color: '#ffe066', delay: 1000 },
+      { text: 'Carry the light forward.',             size: 9,  weight: 400, color: '#99aa77', delay: 1500 },
+      { text: '',                                     size: 8,  weight: 400, color: '#000',    delay: 1700 },
+      { text: 'A tribute to Alan Mathison Turing',    size: 8,  weight: 400, color: '#6688aa', delay: 1900 },
+      { text: '1912 – 1954',                          size: 8,  weight: 400, color: '#556677', delay: 2200 },
+      { text: '',                                     size: 8,  weight: 400, color: '#000',    delay: 2350 },
+      { text: 'The light persisted.',                 size: 11, weight: 700, glow: 5, color: '#ffeeaa', delay: 2600 },
+      { text: '',                                     size: 8,  weight: 400, color: '#000',    delay: 2800 },
+      { text: 'Phaser 3  ·  Tone.js  ·  zero asset files', size: 7, weight: 400, color: '#3a4a5a', delay: 3100 },
+      { text: '',                                     size: 8,  weight: 400, color: '#000',    delay: 3250 },
+      { text: 'SPACE / A  —  Play again',             size: 8,  weight: 700, color: '#4a6a88', delay: 3800 },
     ];
 
     creditLines.forEach((cl, i) => {
+      if (!cl.text) return;
       this.time.delayedCall(cl.delay, () => {
-        const txt = this.add.text(credX, credY + i * 18, cl.text, {
-          fontFamily: 'monospace',
-          fontSize: cl.size,
-          color: cl.color,
-          resolution: 2,
-        }).setOrigin(0.5).setDepth(201).setAlpha(0);
-        this.tweens.add({ targets: txt, alpha: 1, duration: 800, delay: 100 });
+        const txt = uiText(this, credX, credY + i * 18, cl.text, {
+          size: cl.size, weight: cl.weight, color: cl.color, glow: cl.glow || 0,
+          spacing: cl.size > 14 ? 4 : 1, depth: 201,
+        }).setAlpha(0);
+        this.tweens.add({ targets: txt, alpha: 1, duration: 900, delay: 80 });
       });
     });
 
-    this.time.delayedCall(4200, () => {
-      this.input.keyboard.once('keydown-SPACE', () => {
+    this.time.delayedCall(4000, () => {
+      const restart = () => {
         this.registry.set('lightLevel', 0);
         this.registry.set('playerHealth', 3);
         this.scene.start('Title');
-      });
-      this.input.once('pointerdown', () => {
-        this.registry.set('lightLevel', 0);
-        this.registry.set('playerHealth', 3);
-        this.scene.start('Title');
+      };
+      this.input.keyboard.once('keydown-SPACE', restart);
+      this.input.once('pointerdown', restart);
+      // Gamepad restart
+      this.events.on('update', () => {
+        const pad = this.input.gamepad?.getPad(0);
+        if (pad?.A?.justPressed || pad?.buttons?.[0]?.justPressed) restart();
       });
     });
   }

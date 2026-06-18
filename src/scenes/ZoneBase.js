@@ -2,6 +2,7 @@ import { Player } from '../systems/player.js';
 import { ShadowWisp, AllySpirit } from '../systems/enemies.js';
 import { DialogueSystem } from '../systems/dialogue.js';
 import { playZoneMusic, sfxCheckpoint, sfxGateOpen, setMuted, getMuted } from '../systems/audio.js';
+import { uiText } from '../systems/ui.js';
 
 const W = 480, H = 270;
 
@@ -152,46 +153,55 @@ export class ZoneBase extends Phaser.Scene {
       .setScrollFactor(0).setDepth(300).setAlpha(0.35);
 
     // ── Zone header flash ────────────────────────────────────────────────────
+    this._zoneComplete = false;
+
     const zoneNames = ['', 'THE CIPHER HALLS', 'THE LONG NIGHT', 'THE TRANSMISSION'];
-    const zoneHeader = this.add.text(W / 2, 30, `ZONE ${this.zoneNum} — ${zoneNames[this.zoneNum]}`, {
-      fontFamily: 'monospace', fontSize: '7px', color: '#556677', resolution: 2,
-    }).setScrollFactor(0).setDepth(201).setOrigin(0.5);
+    const zoneHeader = uiText(this, W / 2, 30, `ZONE ${this.zoneNum}  —  ${zoneNames[this.zoneNum]}`, {
+      size: 10, weight: 700, color: '#7088a0', spacing: 2, glow: 5, depth: 201,
+    });
     this.tweens.add({
       targets: zoneHeader, alpha: 0, delay: 3000, duration: 1500, onComplete: () => zoneHeader.destroy(),
     });
   }
 
   _createUI() {
-    // Health hearts
+    // Health hearts — larger, more visible
     this._heartImgs = [];
     for (let i = 0; i < 3; i++) {
-      const h = this.add.image(14 + i * 14, 12, 'heart')
-        .setScrollFactor(0).setDepth(200).setScale(1.5);
+      const h = this.add.image(16 + i * 18, 14, 'heart')
+        .setScrollFactor(0).setDepth(200).setScale(2);
       this._heartImgs.push(h);
     }
 
-    // Light meter bar
-    const lbx = 10, lby = 24, lbw = 80, lbh = 5;
+    // Light meter bar — wider and taller
+    const lbx = 8, lby = 28, lbw = 90, lbh = 7;
     this._lightBarBg = this.add.graphics().setScrollFactor(0).setDepth(200);
-    this._lightBarBg.fillStyle(0x111122);
+    this._lightBarBg.fillStyle(0x0a0f1e);
     this._lightBarBg.fillRect(lbx, lby, lbw, lbh);
-    this._lightBarBg.lineStyle(1, 0x334455);
+    this._lightBarBg.lineStyle(1, 0x2a3a55);
     this._lightBarBg.strokeRect(lbx, lby, lbw, lbh);
 
     this._lightBarFill = this.add.graphics().setScrollFactor(0).setDepth(201);
-    this._lightLabel = this.add.text(lbx, lby - 8, 'LIGHT', {
-      fontFamily: 'monospace', fontSize: '5px', color: '#445566', resolution: 2,
-    }).setScrollFactor(0).setDepth(200);
 
-    // Zone indicator
-    this._zoneLabel = this.add.text(W - 8, 8, `ZONE ${this.zoneNum}`, {
-      fontFamily: 'monospace', fontSize: '6px', color: '#334455', resolution: 2,
-    }).setScrollFactor(0).setDepth(200).setOrigin(1, 0);
+    this._lightLabel = uiText(this, lbx, lby - 9, 'LIGHT', {
+      size: 7, weight: 700, color: '#46586a', align: 'left', spacing: 1,
+      origin: { x: 0, y: 0 }, depth: 200,
+    });
 
-    // Mute hint
-    this._muteTxt = this.add.text(W - 8, 18, getMuted() ? '♪ OFF' : '♪ ON', {
-      fontFamily: 'monospace', fontSize: '5px', color: '#2a3a4a', resolution: 2,
-    }).setScrollFactor(0).setDepth(200).setOrigin(1, 0);
+    // Zone indicator top-right
+    this._zoneLabel = uiText(this, W - 8, 8, `ZONE ${this.zoneNum}`, {
+      size: 7, weight: 700, color: '#3a4a5a', origin: { x: 1, y: 0 }, depth: 200, spacing: 1,
+    });
+
+    // Mute / controls hint
+    this._muteTxt = uiText(this, W - 8, 19, getMuted() ? '♪ OFF' : '♪ ON', {
+      size: 7, weight: 700, color: '#2e3e4e', origin: { x: 1, y: 0 }, depth: 200,
+    });
+
+    // Pause hint (very subtle)
+    uiText(this, W - 8, 30, 'P = PAUSE', {
+      size: 6, weight: 400, color: '#283848', origin: { x: 1, y: 0 }, depth: 200,
+    });
   }
 
   _updateUI() {
@@ -219,47 +229,48 @@ export class ZoneBase extends Phaser.Scene {
       this.physics.pause();
       if (!this._pausePanel) this._buildPausePanel();
       this._pausePanel.setVisible(true);
+      this._pauseTexts?.forEach(t => t.setVisible(true));
     } else {
       this.physics.resume();
       this._pausePanel?.setVisible(false);
+      this._pauseTexts?.forEach(t => t.setVisible(false));
     }
   }
 
   _buildPausePanel() {
-    const container = this.add.container(W / 2, H / 2).setScrollFactor(0).setDepth(500);
+    const cx = W / 2, cy = H / 2;
+    const container = this.add.container(cx, cy).setScrollFactor(0).setDepth(500);
 
     const bg = this.add.graphics();
-    bg.fillStyle(0x000000, 0.85);
-    bg.fillRoundedRect(-80, -50, 160, 110, 6);
-    bg.lineStyle(1, 0x334455);
-    bg.strokeRoundedRect(-80, -50, 160, 110, 6);
-
-    const title = this.add.text(0, -35, 'PAUSED', {
-      fontFamily: 'monospace', fontSize: '10px', color: '#88aacc', resolution: 2,
-    }).setOrigin(0.5);
-
-    const resume = this.add.text(0, -8, '[ P ] Resume', {
-      fontFamily: 'monospace', fontSize: '7px', color: '#667788', resolution: 2,
-    }).setOrigin(0.5);
-
-    const muteLabel = this.add.text(0, 8, getMuted() ? '[ M ] Unmute' : '[ M ] Mute', {
-      fontFamily: 'monospace', fontSize: '7px', color: '#667788', resolution: 2,
-    }).setOrigin(0.5);
-
-    const restart = this.add.text(0, 28, '[ R ] Restart Zone', {
-      fontFamily: 'monospace', fontSize: '7px', color: '#667788', resolution: 2,
-    }).setOrigin(0.5);
-
-    const menu = this.add.text(0, 44, '[ ESC ] Title', {
-      fontFamily: 'monospace', fontSize: '7px', color: '#667788', resolution: 2,
-    }).setOrigin(0.5);
-
-    container.add([bg, title, resume, muteLabel, restart, menu]);
+    bg.fillStyle(0x000000, 0.9);
+    bg.fillRoundedRect(-104, -66, 208, 142, 6);
+    bg.lineStyle(1, 0x2a4460);
+    bg.strokeRoundedRect(-104, -66, 208, 142, 6);
+    container.add(bg);
     this._pausePanel = container;
+
+    const title = uiText(this, cx, cy - 48, 'PAUSED', {
+      size: 14, weight: 700, color: '#9abbdd', spacing: 4, glow: 6, depth: 501,
+    });
+    const resume = uiText(this, cx, cy - 16, '[ P ]   Resume', {
+      size: 8, weight: 400, color: '#6a8aaa', depth: 501,
+    });
+    const muteLabel = uiText(this, cx, cy + 2, getMuted() ? '[ M ]   Unmute' : '[ M ]   Mute', {
+      size: 8, weight: 400, color: '#6a8aaa', depth: 501,
+    });
+    const restart = uiText(this, cx, cy + 24, '[ R ]   Restart Zone', {
+      size: 8, weight: 400, color: '#6a8aaa', depth: 501,
+    });
+    const menu = uiText(this, cx, cy + 46, '[ ESC ]   Title Screen', {
+      size: 8, weight: 400, color: '#6a8aaa', depth: 501,
+    });
+
+    this._pauseTexts = [title, resume, muteLabel, restart, menu];
 
     this.input.keyboard.on('keydown-R', () => {
       this._paused = false;
       this._pausePanel.setVisible(false);
+      this._pauseTexts.forEach(t => t.setVisible(false));
       this.physics.resume();
       this.scene.restart();
     });
@@ -269,20 +280,34 @@ export class ZoneBase extends Phaser.Scene {
       this.scene.start('Title');
     });
     this.input.keyboard.on('keydown-M', () => {
-      muteLabel.setText(getMuted() ? '[ M ] Unmute' : '[ M ] Mute');
+      muteLabel.setText(getMuted() ? '[ M ]   Unmute' : '[ M ]   Mute');
     });
   }
 
   update(time, delta) {
     if (this._paused) return;
+
+    // Get gamepad once per frame
+    const pad = this.input.gamepad?.getPad(0) ?? null;
+
+    // Gamepad pause button (Options/Start)
+    if (pad?.start?.justPressed || pad?.buttons?.[9]?.justPressed) {
+      this._togglePause();
+      return;
+    }
+
     if (this._dialogue.active) {
-      this._dialogue.update(delta);
-      // Still allow minimal input but pause physics action
+      this._dialogue.update(delta, pad);
+      return; // physics already paused by DialogueSystem.show()
+    }
+
+    if (this._zoneComplete) {
+      // During fade-out, freeze everything except camera
       return;
     }
 
     // ── Player ───────────────────────────────────────────────────────────────
-    this.player.update(time, delta, this.cursors, this.wasd);
+    this.player.update(time, delta, this.cursors, this.wasd, pad);
 
     // Player dead & fall
     if (this.player.sprite.y > H + 60) {
@@ -308,17 +333,13 @@ export class ZoneBase extends Phaser.Scene {
           }
         }
       }
-      // Player attack connects
+      // Player attack connects — only register when enemy can actually be hit
       if (this.player.isAttacking && !this.player.attackConnected) {
         const d = Phaser.Math.Distance.Between(
           this.player.hitbox.x, this.player.hitbox.y, e.sprite.x, e.sprite.y);
-        if (d < (e.isBoss ? 30 : 18)) {
-          if (e.hit(1)) {
-            this.player.refillLight(30);
-            this.player.attackConnected = true;
-          } else {
-            this.player.attackConnected = true;
-          }
+        if (d < 26 && e.alive && e.hitCooldown <= 0) {
+          this.player.attackConnected = true;
+          if (e.hit(1)) this.player.refillLight(30);
         }
       }
     });
@@ -338,7 +359,7 @@ export class ZoneBase extends Phaser.Scene {
         const d = Phaser.Math.Distance.Between(
           this.player.hitbox.x, this.player.hitbox.y,
           this._boss.sprite.x, this._boss.sprite.y);
-        if (d < 30) {
+        if (d < 36 && this._boss.hitCooldown <= 0) {
           this.player.attackConnected = true;
           const dead = this._boss.hit(1);
           if (dead) {

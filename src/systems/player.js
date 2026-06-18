@@ -106,11 +106,30 @@ export class Player {
     this.sprite.setAlpha(1);
   }
 
-  update(time, delta, cursors, wasd) {
+  update(time, delta, cursors, wasd, pad) {
     if (this.dead) return;
 
     const dt = delta / 1000;
     const onGround = this.sprite.body.blocked.down;
+
+    // Gamepad helpers (standard mapping: PS4/PS5/Xbox all use HID standard)
+    const gpLeft  = pad && (pad.leftStick?.x < -0.25 || pad.left?.pressed  || pad.buttons?.[14]?.pressed);
+    const gpRight = pad && (pad.leftStick?.x >  0.25 || pad.right?.pressed || pad.buttons?.[15]?.pressed);
+    const gpJumpJust = pad && (
+      pad.A?.justPressed || pad.buttons?.[0]?.justPressed ||
+      pad.up?.justPressed || pad.buttons?.[12]?.justPressed
+    );
+    const gpJumpHeld = pad && (
+      pad.A?.pressed || pad.buttons?.[0]?.pressed ||
+      pad.up?.pressed || pad.buttons?.[12]?.pressed
+    );
+    const gpDashJust = pad && (
+      pad.R1?.justPressed || pad.buttons?.[5]?.justPressed ||
+      pad.B?.justPressed  || pad.buttons?.[1]?.justPressed
+    );
+    const gpAttackJust = pad && (
+      pad.X?.justPressed || pad.buttons?.[2]?.justPressed
+    );
 
     // Coyote time
     if (onGround) {
@@ -146,7 +165,7 @@ export class Player {
     }
 
     const dashKey = wasd.dash;
-    if (Phaser.Input.Keyboard.JustDown(dashKey) && this.dashCooldown <= 0 && !this.isDashing) {
+    if ((Phaser.Input.Keyboard.JustDown(dashKey) || gpDashJust) && this.dashCooldown <= 0 && !this.isDashing) {
       this.isDashing = true;
       this.dashTimer = DASH_DURATION;
       this.dashCooldown = DASH_COOLDOWN;
@@ -161,8 +180,8 @@ export class Player {
 
     // ── Horizontal movement ──────────────────────────────────────────────────
     if (!this.isDashing) {
-      const left = cursors.left.isDown || wasd.left.isDown;
-      const right = cursors.right.isDown || wasd.right.isDown;
+      const left  = cursors.left.isDown  || wasd.left.isDown  || gpLeft;
+      const right = cursors.right.isDown || wasd.right.isDown || gpRight;
 
       if (left) {
         this.sprite.setVelocityX(-SPEED);
@@ -180,8 +199,9 @@ export class Player {
     // ── Jump ────────────────────────────────────────────────────────────────
     const jumpDown = Phaser.Input.Keyboard.JustDown(cursors.up) ||
       Phaser.Input.Keyboard.JustDown(wasd.jump) ||
-      Phaser.Input.Keyboard.JustDown(cursors.space);
-    const jumpHeld = cursors.up.isDown || wasd.jump.isDown || cursors.space.isDown;
+      Phaser.Input.Keyboard.JustDown(cursors.space) ||
+      gpJumpJust;
+    const jumpHeld = cursors.up.isDown || wasd.jump.isDown || cursors.space.isDown || gpJumpHeld;
 
     if (jumpDown && this.coyoteTime > 0) {
       this.sprite.setVelocityY(JUMP_VEL);
@@ -201,27 +221,30 @@ export class Player {
 
     // ── Attack ──────────────────────────────────────────────────────────────
     const atkKey = wasd.attack;
-    if (Phaser.Input.Keyboard.JustDown(atkKey) && !this.isAttacking) {
+    if ((Phaser.Input.Keyboard.JustDown(atkKey) || gpAttackJust) && !this.isAttacking) {
       this.isAttacking = true;
       this.attackConnected = false;
       const dir = this.facingRight ? 1 : -1;
-      // Position hitbox
-      this.hitbox.setPosition(
-        this.sprite.x + dir * (ATTACK_RANGE / 2 + 8),
-        this.sprite.y
-      );
-      this.hitbox.body.reset(
-        this.sprite.x + dir * (ATTACK_RANGE / 2 + 8),
-        this.sprite.y
-      );
+      const hx = this.sprite.x + dir * (ATTACK_RANGE / 2 + 8);
+      // Position hitbox (game object position used for distance checks)
+      this.hitbox.setPosition(hx, this.sprite.y);
       this.hitbox.setActive(true);
-      // Attack flash
-      this.scene.tweens.add({
-        targets: this.sprite,
-        alpha: 0.6,
-        duration: 60,
-        yoyo: true,
-      });
+
+      // Visible slash arc
+      const slash = this.scene.add.graphics().setDepth(20);
+      slash.lineStyle(2, 0xffffff, 0.9);
+      slash.strokeLineShape(new Phaser.Geom.Line(
+        this.sprite.x + dir * 6,  this.sprite.y - 14,
+        this.sprite.x + dir * 36, this.sprite.y + 10
+      ));
+      slash.lineStyle(1, 0xaaddff, 0.6);
+      slash.strokeLineShape(new Phaser.Geom.Line(
+        this.sprite.x + dir * 8,  this.sprite.y - 10,
+        this.sprite.x + dir * 32, this.sprite.y + 14
+      ));
+      this.scene.tweens.add({ targets: slash, alpha: 0, duration: 160,
+        onComplete: () => slash.destroy() });
+
       this.scene.time.delayedCall(ATTACK_DURATION, () => {
         this.isAttacking = false;
         this.hitbox.setActive(false);

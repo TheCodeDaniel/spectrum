@@ -21,6 +21,12 @@ const config = {
     width: 480,
     height: 270,
   },
+  dom: {
+    createContainer: true,
+  },
+  input: {
+    gamepad: true,
+  },
   physics: {
     default: 'arcade',
     arcade: {

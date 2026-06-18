@@ -1,4 +1,5 @@
 import { initAudio, playTitleMusic, setMuted, getMuted } from '../systems/audio.js';
+import { uiText } from '../systems/ui.js';
 
 export class Title extends Phaser.Scene {
   constructor() { super('Title'); }
@@ -27,32 +28,25 @@ export class Title extends Phaser.Scene {
     }
 
     // ── SPECTRUM logo ──────────────────────────────────────────────────────
-    // Draw pixel-style letters
-    this._drawLogo(W / 2, 80);
+    this._drawLogo(W / 2, 72);
 
     // Tagline
-    this.add.text(W / 2, 118, 'Carry the light forward.', {
-      fontFamily: 'monospace',
-      fontSize: '9px',
-      color: '#7a9ab8',
-      resolution: 2,
-    }).setOrigin(0.5);
+    uiText(this, W / 2, 110, 'Carry the light forward.', {
+      size: 9, color: '#8ab0d0', weight: 400, spacing: 1, glow: 6,
+    });
 
     // Year / context
-    this.add.text(W / 2, 132, '1952  ·  A tribute to Alan Turing', {
-      fontFamily: 'monospace',
-      fontSize: '6px',
-      color: '#445566',
-      resolution: 2,
-    }).setOrigin(0.5);
+    uiText(this, W / 2, 126, '1952  ·  A tribute to Alan Turing', {
+      size: 7, color: '#5a7088', weight: 400, spacing: 0.5,
+    });
 
-    // ARIA companion draw
-    const aria = this.add.image(W / 2, 158, 'aria').setScale(2);
+    // ARIA companion
+    const aria = this.add.image(W / 2, 156, 'aria').setScale(2);
     this.tweens.add({
-      targets: aria, y: 162, duration: 1200,
+      targets: aria, y: 161, duration: 1200,
       yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     });
-    const ariaGlow = this.add.image(W / 2, 158, 'aria-glow').setScale(2)
+    const ariaGlow = this.add.image(W / 2, 156, 'aria-glow').setScale(2.5)
       .setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.5);
     this.tweens.add({
       targets: ariaGlow, alpha: 0.8, duration: 1000,
@@ -61,36 +55,37 @@ export class Title extends Phaser.Scene {
 
     // Start button
     const startBg = this.add.graphics();
-    startBg.fillStyle(0x112233, 0.9);
-    startBg.fillRoundedRect(W / 2 - 60, 182, 120, 20, 4);
-    startBg.lineStyle(1, 0x3a6a9a);
-    startBg.strokeRoundedRect(W / 2 - 60, 182, 120, 20, 4);
+    startBg.fillStyle(0x0a1a2e, 0.92);
+    startBg.fillRoundedRect(W / 2 - 80, 178, 160, 22, 4);
+    startBg.lineStyle(1, 0x2a5a8a);
+    startBg.strokeRoundedRect(W / 2 - 80, 178, 160, 22, 4);
 
-    const startTxt = this.add.text(W / 2, 192, '[ PRESS SPACE TO BEGIN ]', {
-      fontFamily: 'monospace',
-      fontSize: '6px',
-      color: '#88ccff',
-      resolution: 2,
-    }).setOrigin(0.5);
+    const startTxt = uiText(this, W / 2, 189, 'PRESS SPACE TO BEGIN', {
+      size: 8, color: '#7ab8ee', weight: 700, spacing: 2, glow: 5,
+    });
 
     this.tweens.add({
-      targets: startTxt, alpha: 0.3, duration: 700,
+      targets: startTxt, alpha: 0.3, duration: 650,
       yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     });
 
-    // Controls hint
-    this.add.text(W / 2, 218, 'A/D Move  ·  W/Space Jump  ·  Shift Dash  ·  J Attack', {
-      fontFamily: 'monospace', fontSize: '5px', color: '#334455', resolution: 2,
-    }).setOrigin(0.5);
+    // Controls reference
+    uiText(this, W / 2, 214, 'A/D Move    W / Space Jump    Shift Dash    J Attack', {
+      size: 7, color: '#46586a', weight: 400, spacing: 0.5,
+    });
 
-    this.add.text(W / 2, 227, 'P Pause  ·  M Mute', {
-      fontFamily: 'monospace', fontSize: '5px', color: '#334455', resolution: 2,
-    }).setOrigin(0.5);
+    uiText(this, W / 2, 227, 'Gamepad:  Stick Move  ·  A Jump  ·  X Attack  ·  R1 Dash  ·  Start Pause', {
+      size: 6, color: '#36465a', weight: 400, spacing: 0.5,
+    });
 
-    // Mute toggle text
-    const muteTxt = this.add.text(W - 10, 10, getMuted() ? '♪ OFF' : '♪ ON', {
-      fontFamily: 'monospace', fontSize: '6px', color: '#445566', resolution: 2,
-    }).setOrigin(1, 0);
+    uiText(this, W / 2, 239, 'P = Pause      M = Mute', {
+      size: 6, color: '#36465a', weight: 400, spacing: 0.5,
+    });
+
+    // Mute toggle
+    const muteTxt = uiText(this, W - 10, 9, getMuted() ? '♪ OFF' : '♪ ON', {
+      size: 7, color: '#46586a', weight: 700, origin: { x: 1, y: 0 },
+    });
 
     // Scanlines
     this.add.image(W / 2, H / 2, 'scanlines')
@@ -104,7 +99,19 @@ export class Title extends Phaser.Scene {
     };
 
     this.input.keyboard.once('keydown-SPACE', start);
+    this.input.keyboard.once('keydown-ENTER', start);
     this.input.once('pointerdown', start);
+
+    // Gamepad start — poll since gamepad connect fires async
+    this._waitingForStart = true;
+    this.events.on('update', () => {
+      if (!this._waitingForStart) return;
+      const pad = this.input.gamepad?.getPad(0);
+      if (pad?.A?.justPressed || pad?.start?.justPressed || pad?.buttons?.[0]?.justPressed) {
+        this._waitingForStart = false;
+        start();
+      }
+    });
 
     this.input.keyboard.on('keydown-M', () => {
       setMuted(!getMuted());
@@ -113,26 +120,20 @@ export class Title extends Phaser.Scene {
   }
 
   _drawLogo(cx, cy) {
-    // "SPECTRUM" in chunky pixel text
-    const text = this.add.text(cx, cy, 'SPECTRUM', {
-      fontFamily: 'monospace',
-      fontSize: '28px',
-      fontStyle: 'bold',
-      color: '#ffffff',
-      resolution: 2,
-      stroke: '#000000',
-      strokeThickness: 4,
-    }).setOrigin(0.5);
+    const logo = uiText(this, cx, cy, 'SPECTRUM', {
+      size: 28, weight: 700, spacing: 5, color: '#ffffff', glow: 9, depth: 260,
+    });
 
-    // Rainbow tint sweep
     let hue = 0;
     this.time.addEvent({
       delay: 40,
       loop: true,
       callback: () => {
         hue = (hue + 2) % 360;
-        const rgb = Phaser.Display.Color.HSVToRGB(hue / 360, 0.7, 1);
-        text.setTint(Phaser.Display.Color.GetColor(rgb.r, rgb.g, rgb.b));
+        const rgb = Phaser.Display.Color.HSVToRGB(hue / 360, 0.6, 1);
+        const hex = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+        logo.node.style.color = hex;
+        logo.node.style.textShadow = `0 0 9px ${hex}`;
       },
     });
   }
